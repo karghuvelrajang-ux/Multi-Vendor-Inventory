@@ -1,0 +1,25 @@
+# --- Python & Environment ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# --- Secrets & Config ---
+.env
+
+# --- Tools & Linters ---
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Docker & OS ---
+.DS_Store
+Thumbs.db
+*.log
+
+# --- Database ---
+# If you use a local SQLite file for testing
+*.db
+*.sqlite3

@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_sync
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/inventory_sync
+      SYNC_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/inventory_sync
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: rpc://
+      JWT_SECRET_KEY: dev-jwt-secret-change-in-production
+      SESSION_SECRET_KEY: dev-session-secret-change-in-production
+      WEBHOOK_HMAC_SECRET: dev-webhook-hmac-secret
+      OAUTH_REDIRECT_BASE_URL: http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/inventory_sync
+      SYNC_DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/inventory_sync
+      CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: rpc://
+      JWT_SECRET_KEY: dev-jwt-secret-change-in-production
+      SESSION_SECRET_KEY: dev-session-secret-change-in-production
+      WEBHOOK_HMAC_SECRET: dev-webhook-hmac-secret
+    command: celery -A app.worker.celery_app worker --loglevel=INFO
+    depends_on:
+      api:
+        condition: service_started
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+volumes:
+  pg_data:
